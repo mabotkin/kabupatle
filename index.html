@@ -434,7 +434,7 @@
 	  for (const g of guesses) {
 		text += ( g == target.name ) ? "✅" : "❌";
 	  }
-		for (var i = guesses.length; i <= MAX_TRIES ; i++ ) {
+		for (var i = guesses.length; i < MAX_TRIES ; i++ ) {
 			text += "⬛";
 		}
 
