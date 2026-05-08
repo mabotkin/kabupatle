@@ -106,9 +106,9 @@
 	  recoverGuesses();
     }
 	function recoverGuesses() {
-		if (localStorage.getItem("kabu-date") != today) {
-		  localStorage.kabu-date = today;
-		  localStorage.kabu-todays_guesses = "[]";
+		if (localStorage.getItem("kabu_date") != today) {
+		  localStorage.kabu_date = today;
+		  localStorage.kabu_todays_guesses = "[]";
 		} else {
 		  var arr = JSON.parse(localStorage.kabu-todays_guesses);
 		  for (var i = 0; i < arr.length; i++) {
@@ -317,7 +317,7 @@
         highlightGuessedKabupaten(guess);
       }
       guesses.push( guess.name );
-	  localStorage.kabu-todays_guesses = JSON.stringify(guesses);
+	  localStorage.kabu_todays_guesses = JSON.stringify(guesses);
 
       renderGuess(result);
 
