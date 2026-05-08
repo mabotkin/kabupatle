@@ -2,7 +2,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kabupadle</title>
+  <title>Kabupatle</title>
 	<link rel="shortcut icon" type="image/png" href="favicon.png">
   <link
     rel="stylesheet"
@@ -15,7 +15,7 @@
   <div id="map"></div>
 
   <div class="overlay">
-    <h1>🇮🇩 Kabupadle</h1>
+    <h1>🇮🇩 Kabupatle</h1>
 
     <div class="subtitle">
       Guess the kabupaten in 6 tries.
@@ -429,7 +429,7 @@
 	const shareBtn = document.getElementById("shareBtn");
 	shareBtn.addEventListener("click", shareResults);
 	function shareResults() {
-	  var text = "🇮🇩 Kabupadle " + today + "\n";
+	  var text = "🇮🇩 Kabupatle " + today + "\n";
 
 	  for (const g of guesses) {
 		text += ( g == target.name ) ? "✅" : "❌";
@@ -438,7 +438,7 @@
 			text += "⬛";
 		}
 
-	  text += "\nhttps://mabotkin.github.io/kabupadle";
+	  text += "\nhttps://mabotkin.github.io/kabupatle";
 
 	  navigator.clipboard.writeText(text);
 
