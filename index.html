@@ -110,7 +110,7 @@
 		  localStorage.kabu_date = today;
 		  localStorage.kabu_todays_guesses = "[]";
 		} else {
-		  var arr = JSON.parse(localStorage.kabu-todays_guesses);
+		  var arr = JSON.parse(localStorage.kabu_todays_guesses);
 		  for (var i = 0; i < arr.length; i++) {
 			guessHelper(arr[i]);
 		  }
