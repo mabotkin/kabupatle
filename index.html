@@ -1,0 +1,448 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kabupatenle</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <div class="overlay">
+    <h1>🇮🇩 Kabupatenle</h1>
+
+    <div class="subtitle">
+      Guess the kabupaten in 6 tries.
+    </div>
+
+    <div class="guess-row">
+      <input
+        list="kabupaten-list"
+        id="guessInput"
+        placeholder="Type a kabupaten..."
+      />
+
+      <datalist id="kabupaten-list"></datalist>
+
+      <button onclick="submitGuess()">
+        Guess
+      </button>
+    </div>
+
+    <div class="tries" id="triesText">
+      6 guesses remaining
+    </div>
+
+    <div class="results" id="results"></div>
+
+    <div class="status" id="status"></div>
+	<button id="shareBtn" style="display:none; background:#2d3748; margin:10px auto 0 auto;">
+	  Share Result
+	</button>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map", {
+      zoomControl: true,
+      attributionControl: false
+    });
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+      {
+        subdomains: "abcd",
+        maxZoom: 20
+      }
+    ).addTo(map);
+    const MAX_TRIES = 6;
+
+    let kabupatenData = [];
+    let geojsonLayer;
+    let target;
+
+	var d = new Date();
+	var pstDate = d.toLocaleString("en-us", {
+		timeZone: "America/Los_Angeles"
+	});
+	var nd = new Date(pstDate);
+    var today = (nd.getMonth() + 1) + '/' + nd.getDate() + '/' + nd.getFullYear();
+
+    let guesses = [];
+    let gameOver = false;
+    async function loadGeoJSON() {
+
+      const response = await fetch("kabupaten.json");
+      const data = await response.json();
+
+      kabupatenData = data.features.map(feature => {
+
+        const props = feature.properties;
+
+        return {
+          feature,
+
+          name:
+            props.name ||
+            props.NAME_2 ||
+            props.WADMKK ||
+            "Unknown",
+
+          province:
+            props.province ||
+            props.NAME_1 ||
+            props.WADMPR ||
+            "Unknown"
+        };
+      });
+
+      renderMap(data);
+      populateDatalist();
+      setupDailyTarget();
+	  recoverGuesses();
+    }
+	function recoverGuesses() {
+		if (localStorage.getItem("date") != today) {
+		  localStorage.date = today;
+		  localStorage.todays_guesses = "[]";
+		} else {
+		  var arr = JSON.parse(localStorage.todays_guesses);
+		  for (var i = 0; i < arr.length; i++) {
+			guessHelper(arr[i]);
+		  }
+		}
+	}
+
+    function renderMap(data) {
+
+      geojsonLayer = L.geoJSON(data, {
+
+        style: {
+          color: "#2d3748",
+          weight: 1,
+          fillColor: "#1a202c",
+          fillOpacity: 0.85
+        },
+        onEachFeature: (feature, layer) => {
+
+          layer.on({
+            mouseover: () => {
+              layer.setStyle({
+                fillOpacity: 1,
+                weight: 2,
+                color: "#718096"
+              });
+            },
+
+            mouseout: () => {
+              geojsonLayer.resetStyle(layer);
+            }
+          });
+        }
+      }).addTo(map);
+
+      map.fitBounds(geojsonLayer.getBounds());
+    }
+	const sdbm = str => {
+		  let arr = str.split('');
+		  return arr.reduce(
+			(hashCode, currentVal) =>
+			  (hashCode = currentVal.charCodeAt(0) + (hashCode << 6) + (hashCode << 16) - hashCode),
+			0
+		  );
+		};
+
+
+    function getDailyIndex() {
+		var today = nd.getFullYear() + '/' + (nd.getMonth() + 1) + '/' + nd.getDate();
+		diff = sdbm( today );
+		return diff % kabupatenData.length;
+    }
+
+    function setupDailyTarget() {
+      target = kabupatenData[getDailyIndex()];
+      L.geoJSON(target.feature, {
+        style: {
+          color: "#ffffff",
+          weight: 3,
+          fillColor: "#3182ce",
+          fillOpacity: 0.9
+        }
+      }).addTo(map);
+    }
+
+    function populateDatalist() {
+
+      const datalist =
+        document.getElementById("kabupaten-list");
+      datalist.innerHTML = "";
+      const sorted = [...kabupatenData]
+        .sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+
+      sorted.forEach(kab => {
+
+        const option = document.createElement("option");
+
+        option.value = kab.name;
+
+        datalist.appendChild(option);
+      });
+    }
+
+    function getFeatureCenter(feature) {
+
+      const bounds = L.geoJSON(feature).getBounds();
+
+      const center = bounds.getCenter();
+
+      return {
+        lat: center.lat,
+        lng: center.lng
+      };
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+
+      const R = 6371;
+
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+      const c = 2 * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      );
+
+      return Math.round(R * c);
+    }
+
+    function getDirection(from, to) {
+
+      const vertical =
+        from.lat < to.lat ? "⬆️ North" : "⬇️ South";
+
+      const horizontal =
+        from.lng < to.lng ? "➡️ East" : "⬅️ West";
+
+      return `${vertical} ${horizontal}`;
+    }
+
+    function submitGuess() {
+
+      if (gameOver) return;
+
+      const input =
+        document.getElementById("guessInput");
+      const value = input.value.trim();
+
+		guessHelper( value );
+      input.value = "";
+	}
+
+	function guessHelper( value ){
+
+
+      const guess = kabupatenData.find(
+        k => k.name.toLowerCase() === value.toLowerCase()
+      );
+
+      if (!guess) {
+        alert("Kabupaten not found");
+        return;
+      }
+
+      if (guesses.find(g => g.name === guess.name)) {
+        alert("Already guessed");
+        return;
+      }
+
+      const guessCenter =
+        getFeatureCenter(guess.feature);
+
+      const targetCenter =
+        getFeatureCenter(target.feature);
+
+      const correct =
+        guess.name === target.name;
+
+      let result;
+
+      if (correct) {
+
+        result = {
+          name: guess.name,
+          correct: true
+        };
+
+        highlightCorrectKabupaten(target);
+
+        finishGame(
+          `🎉 Correct! The answer was ${target.name}`
+        );
+
+      } else {
+
+        const distance = calculateDistance(
+          guessCenter.lat,
+          guessCenter.lng,
+          targetCenter.lat,
+          targetCenter.lng
+        );
+
+        const direction = getDirection(
+          guessCenter,
+          targetCenter
+        );
+
+        result = {
+          name: guess.name,
+          distance,
+          direction,
+          correct: false
+        };
+
+        highlightGuessedKabupaten(guess);
+      }
+      guesses.push( guess.name );
+	  localStorage.todays_guesses = JSON.stringify(guesses);
+
+      renderGuess(result);
+
+      updateTries();
+
+
+      if (
+        guesses.length >= MAX_TRIES &&
+        !correct
+      ) {
+
+        highlightCorrectKabupaten(target);
+
+        finishGame(
+          `💀 Game Over — ${target.name}`
+        );
+      }
+    }
+    function highlightGuessedKabupaten(kabu) {
+	  feature = kabu.feature;
+      L.geoJSON(feature, {
+        style: {
+          color: "#f6ad55",
+          weight: 2,
+          fillColor: "#dd6b20",
+          fillOpacity: 0.7
+        },
+		onEachFeature: function (feature, layer) {
+			layer.bindTooltip(kabu.name, {
+			  permanent: false,
+			  sticky: true,
+			  direction: "center",
+			  className: "kab-label"
+			});
+		  }
+      }).addTo(map);
+    }
+
+    function highlightCorrectKabupaten(kabu) {
+	  feature = kabu.feature;
+      L.geoJSON(feature, {
+        style: {
+          color: "#68d391",
+          weight: 3,
+          fillColor: "#38a169",
+          fillOpacity: 0.9
+        },
+		onEachFeature: function (feature, layer) {
+			layer.bindTooltip(kabu.name, {
+			  permanent: false,
+			  sticky: true,
+			  direction: "center",
+			  className: "kab-label"
+			});
+		}
+      }).addTo(map);
+    }
+
+    function renderGuess(data) {
+
+      const div = document.createElement("div");
+
+      div.className =
+        `result ${data.correct ? "correct" : ""}`;
+
+      if (data.correct) {
+
+        div.innerHTML = `
+          ✅ <strong>${data.name}</strong>
+        `;
+
+      } else {
+
+        div.innerHTML = `
+          ❌ <strong>${data.name}</strong>: Distance: ${data.distance}km
+        `;
+      }
+
+      document
+        .getElementById("results")
+        .append(div);
+    }
+
+    function updateTries() {
+
+      const remaining =
+        MAX_TRIES - guesses.length;
+
+      document.getElementById(
+        "triesText"
+      ).innerText =
+        `${remaining} guesses remaining`;
+    }
+
+    function finishGame(message) {
+
+      gameOver = true;
+
+      document.getElementById(
+        "status"
+      ).innerText = message;
+
+      document.getElementById(
+        "guessInput"
+      ).disabled = true;
+	  shareBtn.style.display = "block";
+    }
+	
+	const shareBtn = document.getElementById("shareBtn");
+	shareBtn.addEventListener("click", shareResults);
+	function shareResults() {
+	  var text = "🇮🇩 Kabupatenle " + today + "\n";
+
+	  for (const g of guesses) {
+		text += ( g == target.name ) ? "✅" : "❌";
+	  }
+
+	  text += "\nhttps://mabotkin.github.io/kabupatenle";
+
+	  navigator.clipboard.writeText(text);
+
+	  alert("Copied results to clipboard!");
+	}
+
+    loadGeoJSON();
+  </script>
+
+</body>
+</html>
