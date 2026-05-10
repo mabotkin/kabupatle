@@ -158,7 +158,6 @@
 
 
     function getDailyIndex() {
-		var today = nd.getFullYear() + '/' + (nd.getMonth() + 1) + '/' + nd.getDate();
 		diff = sdbm( today );
 		n = kabupatenData.length;
 		return ( ( diff % n ) + n ) % n;
