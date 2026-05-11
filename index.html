@@ -82,11 +82,11 @@
 			layer,
 			name,
 			province
-		  });
-		  layer.on("click", () => {
+		});
+		layer.on("click", () => {
 			handleGuess(feature, layer, name);
-		  });
-		  layer.on("mouseover", () => {
+		});
+		layer.on("mouseover", () => {
 			if (gameOver) return;
 			if (hoveredLayer && hoveredLayer !== layer) {
 			const prevName =
@@ -114,8 +114,9 @@
 			fillOpacity: 1
 			});
 			layer.bringToFront();
-			});
-			layer.on("mouseout", () => {
+		});
+		layer.on("mouseout", () => {
+			if (gameOver) return;
 			const alreadyGuessed =
 			guesses.find(g => g.name === name);
 			if (alreadyGuessed) return;
