@@ -91,7 +91,7 @@
 			if (hoveredLayer && hoveredLayer !== layer) {
 			const prevName =
 			  hoveredLayer.feature.properties.name ||
-			  hoveredLayer.feature.properties.NAME_2;
+			  hoveredLayer.feature.properties.NAME_2 ||
 			  hoveredLayer.feature.properties.WADMKK;
 			const alreadyGuessed =
 			  guesses.find(g => g.name === prevName);
