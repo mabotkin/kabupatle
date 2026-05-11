@@ -53,6 +53,7 @@
 	const MAX = 6;
 
 	let gameOver = false;
+	let hoveredLayer = null;
 
 	async function loadData() {
 	  const res = await fetch("kabupaten.json");
@@ -85,6 +86,46 @@
 		  layer.on("click", () => {
 			handleGuess(feature, layer, name);
 		  });
+		  layer.on("mouseover", () => {
+			if (gameOver) return;
+			if (hoveredLayer && hoveredLayer !== layer) {
+			const prevName =
+			  hoveredLayer.feature.properties.name ||
+			  hoveredLayer.feature.properties.NAME_2;
+			  hoveredLayer.feature.properties.WADMKK;
+			const alreadyGuessed =
+			  guesses.find(g => g.name === prevName);
+			if (!alreadyGuessed) {
+			  hoveredLayer.setStyle({
+				  color: "#2d3748",
+				  weight: 1,
+				  fillColor: "#1a202c",
+				  fillOpacity: 0.85
+			  });
+			}
+			}
+			hoveredLayer = layer;
+			const alreadyGuessed =
+			guesses.find(g => g.name === name);
+			if (alreadyGuessed) return;
+			layer.setStyle({
+			weight: 3,
+			color: "#60a5fa",
+			fillOpacity: 1
+			});
+			layer.bringToFront();
+			});
+			layer.on("mouseout", () => {
+			const alreadyGuessed =
+			guesses.find(g => g.name === name);
+			if (alreadyGuessed) return;
+			layer.setStyle({
+			  color: "#2d3748",
+			  weight: 1,
+			  fillColor: "#1a202c",
+			  fillOpacity: 0.85	
+			});
+		});
 		}
 	  }).addTo(map);
 
