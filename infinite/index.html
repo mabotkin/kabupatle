@@ -1,0 +1,280 @@
+
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<title>Kabupatle</title>
+	<link rel="shortcut icon" type="image/png" href="../favicon.png">
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+	<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+	<div id="map"></div>
+	<div class="overlay">
+	  <h1>🇮🇩 Kabupatle &infin;</h1>
+	  <div class="subtitle">
+		Click the correct kabupaten on the map
+	  </div>
+	  <div class="target" id="targetName">
+		Loading...
+	  </div>
+	  <div class="tries" id="triesText">
+		6 guesses remaining
+	  </div>
+	  <div class="results" id="results"></div>
+	  <div class="status" id="status"></div>
+	  <button id="shareBtn">
+		New Game
+	  </button>
+	</div>
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+	<script>
+
+	const map = L.map("map", {
+	  attributionControl: false
+	});
+
+	L.tileLayer(
+	  "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+	  {
+		subdomains: "abcd"
+	  }
+	).addTo(map);
+
+	let kabupatenData = [];
+	let target;
+	let guesses = [];
+	var d = new Date();
+	var pstDate = d.toLocaleString("en-us", {
+		timeZone: "America/Los_Angeles"
+	});
+	var nd = new Date(pstDate);
+    var today = (nd.getMonth() + 1) + '/' + nd.getDate() + '/' + nd.getFullYear();
+
+	const MAX = 6;
+
+	let gameOver = false;
+	let hoveredLayer = null;
+
+	async function loadData() {
+	  const res = await fetch("../kabupaten.json");
+	  const geo = await res.json();
+	  const geoLayer = L.geoJSON(geo, {
+		style: {
+		  color: "#2d3748",
+		  weight: 1,
+		  fillColor: "#1a202c",
+		  fillOpacity: 0.85
+		},
+		onEachFeature: function(feature, layer) {
+		  const props = feature.properties;
+		  const name =
+			props.name ||
+			props.NAME_2 ||
+			props.WADMKK ||
+			"Unknown";
+		  const province =
+            props.province ||
+            props.NAME_1 ||
+            props.WADMPR ||
+            "Unknown";
+		  kabupatenData.push({
+			feature,
+			layer,
+			name,
+			province
+		});
+		layer.on("click", () => {
+			handleGuess(feature, layer, name);
+		});
+		layer.on("mouseover", () => {
+			if (gameOver) return;
+			if (hoveredLayer && hoveredLayer !== layer) {
+			const prevName =
+			  hoveredLayer.feature.properties.name ||
+			  hoveredLayer.feature.properties.NAME_2 ||
+			  hoveredLayer.feature.properties.WADMKK;
+			const alreadyGuessed =
+			  guesses.find(g => g.name === prevName);
+			if (!alreadyGuessed) {
+			  hoveredLayer.setStyle({
+				  color: "#2d3748",
+				  weight: 1,
+				  fillColor: "#1a202c",
+				  fillOpacity: 0.85
+			  });
+			}
+			}
+			hoveredLayer = layer;
+			const alreadyGuessed =
+			guesses.find(g => g.name === name);
+			if (alreadyGuessed) return;
+			layer.setStyle({
+			weight: 3,
+			color: "#60a5fa",
+			fillOpacity: 1
+			});
+			layer.bringToFront();
+		});
+		layer.on("mouseout", () => {
+			if (gameOver) return;
+			const alreadyGuessed =
+			guesses.find(g => g.name === name);
+			if (alreadyGuessed) return;
+			layer.setStyle({
+			  color: "#2d3748",
+			  weight: 1,
+			  fillColor: "#1a202c",
+			  fillOpacity: 0.85	
+			});
+		});
+		}
+	  }).addTo(map);
+
+	  map.fitBounds(geoLayer.getBounds());
+	  setupDailyTarget();
+	}
+	const sdbm = str => {
+	  let arr = str.split('');
+	  return arr.reduce(
+		(hashCode, currentVal) =>
+		  (hashCode = currentVal.charCodeAt(0) + (hashCode << 6) + (hashCode << 16) - hashCode),
+		0
+	  );
+	};
+	function setupDailyTarget() {
+		const idx =	Math.floor( Math.random() * kabupatenData.length );
+		target = kabupatenData[idx];
+		document.getElementById("targetName").innerText = target.name;
+	}
+	function handleGuess(feature, layer, name) {
+		handleGuess_helper( feature, layer , name );
+	}
+	function handleGuess_helper( feature , layer , name ) {
+	  if (gameOver) return;
+	  if (guesses.find(g => g.name === name)) return;
+	  const correct = name === target.name;
+	  layer.setStyle({
+		  color: correct ? "#38a169" : "#dd6b20",
+		  weight: 2,
+		  fillColor: correct ? "#38a169" : "#dd6b20",
+		  fillOpacity: 0.65
+		});
+		layer.bringToFront();
+	  layer.bindTooltip(name, {
+		permanent: false,
+		sticky: true,
+		direction: "center",
+		className: "kab-label"
+	  });
+	  const guessedCenter =
+		layer.getBounds().getCenter();
+	  const targetCenter =
+		target.layer.getBounds().getCenter();
+	  const distance =
+		calculateDistance(
+		  guessedCenter.lat,
+		  guessedCenter.lng,
+		  targetCenter.lat,
+		  targetCenter.lng
+		);
+	  const direction =
+		getDirection(
+		  guessedCenter,
+		  targetCenter
+		);
+	  guesses.push({
+		name,
+		correct,
+		distance,
+		direction
+	  });
+	  renderGuesses();
+	  if (correct || guesses.length >= MAX) {
+		endGame(correct);
+	  }
+	}
+	function renderGuesses() {
+	  document.getElementById("results").innerHTML =
+		guesses.map(g => `
+		  <div class="result ${g.correct ? "correct" : ""}">
+			<span>${g.name}</span>
+			<span>
+			  ${
+				g.correct
+				  ? "🟩"
+				  : `${g.distance} km ${g.direction}`
+			  }
+			</span>
+		  </div>
+		`).join("");
+	  document.getElementById("triesText").innerText =
+		`${MAX - guesses.length} guesses remaining`;
+	}
+	function endGame(win) {
+		gameOver = true;
+		document.getElementById("status").innerText =
+		win
+		  ? "You found it!"
+		  : `Game Over: The answer was ${target.name}.`;
+		document.getElementById("shareBtn").style.display = "block";
+		if (!win) {
+		  target.layer.setStyle({
+			color: "#38a169",
+			weight: 3,
+			fillColor: "#38a169",
+			fillOpacity: 0.75
+		  });
+		  target.layer.bindTooltip(target.name, {
+			permanent: false,
+			sticky: true,
+			direction: "center",
+			className: "kab-label"
+		  });
+		  target.layer.bringToFront();
+		}
+	}
+	function calculateDistance(lat1, lon1, lat2, lon2) {
+	  const R = 6371;
+	  const dLat =
+		(lat2 - lat1) * Math.PI / 180;
+	  const dLon =
+		(lon2 - lon1) * Math.PI / 180;
+	  const a =
+		Math.sin(dLat/2) * Math.sin(dLat/2) +
+		Math.cos(lat1 * Math.PI / 180) *
+		Math.cos(lat2 * Math.PI / 180) *
+		Math.sin(dLon/2) *
+		Math.sin(dLon/2);
+	  return Math.round(
+		2 * R * Math.atan2(
+		  Math.sqrt(a),
+		  Math.sqrt(1-a)
+		)
+	  );
+	}
+	function getDirection(from, to) {
+	  const latDiff = to.lat - from.lat;
+	  const lngDiff = to.lng - from.lng;
+	  let vertical = "";
+	  let horizontal = "";
+	  if (Math.abs(latDiff) > 0.2) {
+		vertical = latDiff > 0 ? "⬆️" : "⬇️";
+	  }
+	  if (Math.abs(lngDiff) > 0.2) {
+		horizontal = lngDiff > 0 ? "➡️" : "⬅️";
+	  }
+	  return vertical + horizontal;
+	}
+	document.getElementById("shareBtn").addEventListener("click", shareResults);
+	function shareResults() {
+		window.location.reload();
+	}
+	window.addEventListener(
+	  "DOMContentLoaded",
+	  loadData
+	);
+	</script>
+</body>
+</html>
+
